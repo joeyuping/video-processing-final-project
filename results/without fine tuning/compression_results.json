@@ -1,0 +1,107 @@
+{
+    "timestamp": "2024-12-27T17:45:46.390759",
+    "compression_results": {
+        "topk": [
+            {
+                "ratio": 1.0,
+                "accuracy": 79.26,
+                "bit_compression": 1.630324125289917,
+                "value_ratio": 0.7245888710021973,
+                "accuracy_drop": 0.0
+            },
+            {
+                "ratio": 0.5,
+                "accuracy": 76.7,
+                "bit_compression": 1.0506603717803955,
+                "value_ratio": 0.46696028113365173,
+                "accuracy_drop": 2.5600000000000023
+            },
+            {
+                "ratio": 0.4,
+                "accuracy": 75.76,
+                "bit_compression": 0.88630211353302,
+                "value_ratio": 0.3939121961593628,
+                "accuracy_drop": 3.5
+            },
+            {
+                "ratio": 0.3,
+                "accuracy": 73.6,
+                "bit_compression": 0.6736029386520386,
+                "value_ratio": 0.2993791401386261,
+                "accuracy_drop": 5.660000000000011
+            },
+            {
+                "ratio": 0.2,
+                "accuracy": 69.16,
+                "bit_compression": 0.44819000363349915,
+                "value_ratio": 0.19919553399085999,
+                "accuracy_drop": 10.100000000000009
+            },
+            {
+                "ratio": 0.1,
+                "accuracy": 55.55,
+                "bit_compression": 0.22412052750587463,
+                "value_ratio": 0.0996091365814209,
+                "accuracy_drop": 23.710000000000008
+            },
+            {
+                "ratio": 0.05,
+                "accuracy": 34.85,
+                "bit_compression": 0.112060546875,
+                "value_ratio": 0.0498046875,
+                "accuracy_drop": 44.410000000000004
+            }
+        ],
+        "uniform": [
+            {
+                "ratio": 1.0,
+                "accuracy": 79.26,
+                "bit_compression": 1.630324125289917,
+                "value_ratio": 0.7245888710021973,
+                "accuracy_drop": 0.0
+            },
+            {
+                "ratio": 0.5,
+                "accuracy": 40.7,
+                "bit_compression": 0.8151369094848633,
+                "value_ratio": 0.36228299140930176,
+                "accuracy_drop": 38.56
+            },
+            {
+                "ratio": 0.4,
+                "accuracy": 19.5,
+                "bit_compression": 0.6511595249176025,
+                "value_ratio": 0.2894041836261749,
+                "accuracy_drop": 59.760000000000005
+            },
+            {
+                "ratio": 0.3,
+                "accuracy": 6.22,
+                "bit_compression": 0.48878955841064453,
+                "value_ratio": 0.21723969280719757,
+                "accuracy_drop": 73.04
+            },
+            {
+                "ratio": 0.2,
+                "accuracy": 1.55,
+                "bit_compression": 0.3247896432876587,
+                "value_ratio": 0.14435094594955444,
+                "accuracy_drop": 77.71000000000001
+            },
+            {
+                "ratio": 0.1,
+                "accuracy": 1.0,
+                "bit_compression": 0.16239427030086517,
+                "value_ratio": 0.07217522710561752,
+                "accuracy_drop": 78.26
+            },
+            {
+                "ratio": 0.05,
+                "accuracy": 1.0,
+                "bit_compression": 0.08118867874145508,
+                "value_ratio": 0.03608386963605881,
+                "accuracy_drop": 78.26
+            }
+        ]
+    }
+}

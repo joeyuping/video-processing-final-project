@@ -1,0 +1,11 @@
+desktop.ini
+**/desktop.ini
+**/**/desktop.ini
+.DS_Store
+__pycache__/
+**/__pycache__/
+*.pyc
+/cifar100
+/stanford_dogs
+*.pth
+**/*.pth
