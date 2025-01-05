@@ -115,7 +115,7 @@ def run_length_decode(values: List[int], lengths: List[int]) -> torch.Tensor:
     return torch.tensor(decoded)
 
 class FeatureCompressor:
-    def __init__(self, compression_ratio=0.1, num_bits=8, image_size=(32, 32), mode='channel_wise', block_size=4):
+    def __init__(self, compression_ratio=0.1, num_bits=8, image_size=(32, 32), mode='channel-wise', block_size=4):
         self.compression_ratio = compression_ratio
         self.num_bits = num_bits
         self.image_height, self.image_width = image_size
@@ -201,7 +201,7 @@ class FeatureCompressor:
             indices_list.append(all_indices)
             values_list.append(all_values)
 
-        elif self.mode == 'channel_wise':
+        elif self.mode == 'channel-wise':
             # Calculate block energies
             block_energies = blocks.pow(2).sum(dim=(-1, -2))  # [B, C, H_b, W_b]
             
@@ -408,48 +408,53 @@ class FeatureCompressor:
         # 2. Optimize indices encoding based on compression mode
         indices = compressed_data.indices
         if self.mode == 'global':
-            # Create Huffman coder for indices
+             # Create Huffman coder for indices
             huffman_coder = HuffmanCoder()
             
-            # Process batch indices
-            batch_indices = indices[0]
-            batch_stats = huffman_coder.fit(batch_indices, 'batch')
-            encoded_batch, batch_bits = huffman_coder.encode(batch_indices, 'batch')
-            huffman_bits += batch_bits
+            # For global mode, batch indices follow a regular pattern
+            # We only need to store:
+            # 1. batch_size as metadata
+            # 2. number of blocks per batch (k) as metadata
+            # 3. Huffman-encoded channel indices
+            # 4. Delta-encoded spatial coordinates
             
             # Process channel indices (more variation in global mode)
             channel_indices = indices[1]
             channel_stats = huffman_coder.fit(channel_indices, 'channel')
             encoded_channel, channel_bits = huffman_coder.encode(channel_indices, 'channel')
-            huffman_bits += channel_bits
             
-            # Process spatial coordinates
-            h_indices = indices[2]
-            w_indices = indices[3]
+            # Group spatial coordinates by batch
+            blocks_per_batch = len(channel_indices) // batch_size
+            h_indices = indices[2].reshape(batch_size, blocks_per_batch)  # [B, K]
+            w_indices = indices[3].reshape(batch_size, blocks_per_batch)  # [B, K]
             
-            # Sort indices by channel for better delta encoding
-            sort_idx = channel_indices.argsort()
-            h_indices = h_indices[sort_idx]
-            w_indices = w_indices[sort_idx]
-            
-            # Calculate deltas
+            # Calculate deltas within each batch
             h_deltas = torch.zeros_like(h_indices)
             w_deltas = torch.zeros_like(w_indices)
-            h_deltas[1:] = h_indices[1:] - h_indices[:-1]
-            w_deltas[1:] = w_indices[1:] - w_indices[:-1]
-            h_deltas[0] = h_indices[0]
-            w_deltas[0] = w_indices[0]
+            
+            # Calculate deltas for first block in each batch
+            h_deltas[:, 0] = h_indices[:, 0]
+            w_deltas[:, 0] = w_indices[:, 0]
+            
+            # Calculate deltas for subsequent blocks
+            h_deltas[:, 1:] = h_indices[:, 1:] - h_indices[:, :-1]
+            w_deltas[:, 1:] = w_indices[:, 1:] - w_indices[:, :-1]
             
             # Encode spatial deltas
-            h_stats = huffman_coder.fit(h_deltas, 'height')
-            w_stats = huffman_coder.fit(w_deltas, 'width')
+            h_stats = huffman_coder.fit(h_deltas.flatten(), 'height')
+            w_stats = huffman_coder.fit(w_deltas.flatten(), 'width')
             
-            encoded_h, h_bits = huffman_coder.encode(h_deltas, 'height')
-            encoded_w, w_bits = huffman_coder.encode(w_deltas, 'width')
+            encoded_h, h_bits = huffman_coder.encode(h_deltas.flatten(), 'height')
+            encoded_w, w_bits = huffman_coder.encode(w_deltas.flatten(), 'width')
             
-            huffman_bits += h_bits + w_bits
+            # Add metadata bits
+            # - 16 bits for batch_size
+            # - 16 bits for blocks_per_batch (k)
+            metadata_bits = 32
+            
+            huffman_bits = channel_bits + h_bits + w_bits + metadata_bits
 
-        elif self.mode == 'channel_wise':
+        elif self.mode == 'channel-wise':
             # Create Huffman coder for indices
             huffman_coder = HuffmanCoder()
             
@@ -476,40 +481,37 @@ class FeatureCompressor:
             # Create Huffman coder for indices
             huffman_coder = HuffmanCoder()
             
-            # Process batch indices (should be more regular due to region-wise selection)
-            batch_indices = indices[0]
-            batch_stats = huffman_coder.fit(batch_indices, 'batch')
-            encoded_batch, batch_bits = huffman_coder.encode(batch_indices, 'batch')
-            huffman_bits += batch_bits
+            # For region-wise, we know that each selected region uses all channels
+            # So we only need to encode the spatial coordinates (h, w) for each region
+            # and store metadata about batch_size and channels
             
-            # Process channel indices (should follow a regular pattern)
-            channel_indices = indices[1]
-            channel_stats = huffman_coder.fit(channel_indices, 'channel')
-            encoded_channel, channel_bits = huffman_coder.encode(channel_indices, 'channel')
-            huffman_bits += channel_bits
+            # Group spatial coordinates by region
+            h_indices = indices[2].reshape(batch_size, -1)  # [B, R] where R is regions per batch
+            w_indices = indices[3].reshape(batch_size, -1)  # [B, R]
             
-            # Process spatial coordinates (h, w) together as they're selected by region
-            h_indices = indices[2]
-            w_indices = indices[3]
-            
-            # Calculate deltas for spatial coordinates
+            # Calculate deltas within each batch
             h_deltas = torch.zeros_like(h_indices)
             w_deltas = torch.zeros_like(w_indices)
             
-            # Group by regions for more efficient delta encoding
-            region_size = self.block_size
-            for i in range(0, len(h_indices), channels):
-                h_deltas[i:i+channels] = h_indices[i:i+channels] - h_indices[i] if i > 0 else h_indices[i:i+channels]
-                w_deltas[i:i+channels] = w_indices[i:i+channels] - w_indices[i] if i > 0 else w_indices[i:i+channels]
+            # Calculate deltas for first region in each batch
+            h_deltas[:, 0] = h_indices[:, 0]
+            w_deltas[:, 0] = w_indices[:, 0]
+            
+            # Calculate deltas for subsequent regions
+            h_deltas[:, 1:] = h_indices[:, 1:] - h_indices[:, :-1]
+            w_deltas[:, 1:] = w_indices[:, 1:] - w_indices[:, :-1]
             
             # Encode spatial deltas
-            h_stats = huffman_coder.fit(h_deltas, 'height')
-            w_stats = huffman_coder.fit(w_deltas, 'width')
+            h_stats = huffman_coder.fit(h_deltas.flatten(), 'height')
+            w_stats = huffman_coder.fit(w_deltas.flatten(), 'width')
             
-            encoded_h, h_bits = huffman_coder.encode(h_deltas, 'height')
-            encoded_w, w_bits = huffman_coder.encode(w_deltas, 'width')
+            encoded_h, h_bits = huffman_coder.encode(h_deltas.flatten(), 'height')
+            encoded_w, w_bits = huffman_coder.encode(w_deltas.flatten(), 'width')
             
-            huffman_bits += h_bits + w_bits
+            # Add minimal metadata bits (assuming 16 bits each for batch_size and channels)
+            metadata_bits = 32  # 16 bits each for batch_size and num_channels
+            
+            huffman_bits = h_bits + w_bits + metadata_bits
 
         # Calculate final statistics
         total_compressed_bits = value_bits + huffman_bits
@@ -518,7 +520,7 @@ class FeatureCompressor:
         
         bpp_original = original_bits / total_pixels
         bpp_compressed = total_compressed_bits / total_pixels
-        compression_ratio = original_bits / total_compressed_bits
+        compression_ratio = total_compressed_bits /original_bits
         
         # Return detailed statistics
         stats = {
@@ -543,7 +545,7 @@ class FeatureCompressor:
         return compression_ratio, bpp_compressed, stats
 
 class ModifiedResNet18(nn.Module):
-    def __init__(self, compression_ratio=0.1, num_classes=100, mode='channel_wise', block_size=4):
+    def __init__(self, compression_ratio=0.1, num_classes=100, mode='channel-wise', block_size=4):
         super(ModifiedResNet18, self).__init__()
         
         # Load pre-trained ResNet18
@@ -912,7 +914,7 @@ def evaluate_model(model, test_loader, calculate_compression_stats=False):
                 feature_maps = model.get_feature_maps(images)
                 compressed_data = model.compressor.compress_features(feature_maps)
                 compression_stats = model.compressor.calculate_compression_ratio(
-                    compressed_data, feature_maps.size())
+                    compressed_data, images.size())
             elif batch_idx == 0 and calculate_compression_stats and model.is_baseline:
                 # For baseline, use dummy compression stats
                 compression_stats = (1.0, 24.0, {
@@ -1041,7 +1043,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch-size', type=int, default=128,
                        help='Batch size for training')
-    parser.add_argument('--mode', type=str, default='channel_wise',
+    parser.add_argument('--mode', type=str, default='channel-wise',
                        help='Compression mode: channel-wise, region-wise or global')
     parser.add_argument('--subset', action='store_true',
                        help='Use subset of data for testing')
