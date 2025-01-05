@@ -1,8 +1,23 @@
+# Deep Learning Framework
 torch>=1.9.0
 torchvision>=0.10.0
+
+# Data Processing & Scientific Computing
 numpy>=1.19.2
-tqdm>=4.62.3
 pillow>=8.3.1
+
+# Progress Bars & Utilities
+tqdm>=4.62.3
+
+# Model Zoo & Pre-trained Models
 timm>=0.9.2
-huggingface_hub
+huggingface_hub>=0.0.12
+
+# Visualization
 matplotlib>=3.5.0
+
+# Compression Utilities
+huffman-codec>=0.3.0
+
+# Optional: CUDA support (uncomment if needed)
+# cupy>=9.0.0

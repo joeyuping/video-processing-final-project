@@ -441,6 +441,7 @@ class FeatureCompressor:
         
         return {
             'bpp': bpp,
+            'bpp_original': 24,
             'bpp_fixed': bpp_fixed,
             'compression_ratio': dense_size/total_compressed_bits,
             'total_compressed_bits': total_compressed_bits,
@@ -569,12 +570,16 @@ class ModifiedResNet18(nn.Module):
         
         return x
     
-    def get_feature_maps(self, x):
+    def get_feature_maps(self, x, compressed=False):
         """Get intermediate feature maps after layer1."""
         x = self.resnet.conv1(x)
         x = self.resnet.bn1(x)
         x = self.resnet.relu(x)
         x = self.resnet.layer1(x)
+
+        if compressed:
+            compressed = self.compressor.compress_features(x)
+            x = self.compressor.decompress_features(compressed, x.size())
         return x
     
     def get_compression_stats(self):
@@ -880,48 +885,84 @@ def plot_accuracy_vs_compression(results, save_path='accuracy_vs_compression.png
     print(f"Plot saved as {save_path}")
 
 def plot_feature_maps_with_ratios(feature_maps, original_image, compression_ratios, save_path='feature_maps_ratio.png'):
-    """Plot feature maps for different compression ratios and the original image."""
-    num_ratios = len(compression_ratios) + 1  # +1 for original feature map
-    num_features = min(4, feature_maps[0].shape[1])  # Show up to 4 feature channels
+    """Plot feature maps for different compression ratios and the original image horizontally."""
+    num_maps = len(feature_maps)  # Number of feature maps we actually have
+    num_features = min(4, feature_maps[0].shape[1] if isinstance(feature_maps[0], torch.Tensor) else 4)
     
-    # Create a figure with subplots
-    fig, axes = plt.subplots(num_ratios + 1, num_features, figsize=(15, 3*(num_ratios + 1)))
-    fig.suptitle('Feature Maps at Different Compression Ratios', fontsize=16, y=0.95)
+    # Create a figure with subplots - one column for each compression ratio, num_features rows
+    # Reduce horizontal size by adjusting figure width
+    fig = plt.figure(figsize=(2.5*(num_maps + 1), 10))  # Reduced from 4* to 2.5*
     
-    # Plot original image in the first row
+    # Add suptitle with more space at top
+    fig.suptitle('Feature Maps at Different Compression Ratios', 
+                fontsize=20, y=0.95)
+    
+    # Create subplot grid with more space between plots
+    gs = plt.GridSpec(num_features, num_maps + 1, 
+                     hspace=0.1,    # Space between rows
+                     wspace=0.15)   # Reduced horizontal space between plots (from 0.3)
+    
+    # Create axes array - transposed for horizontal layout
+    axes = [[plt.subplot(gs[i, j]) for j in range(num_maps + 1)] 
+            for i in range(num_features)]
+    axes = np.array(axes)
+    
+    # Plot original image in the first column
     if original_image.shape[0] == 3:  # If image is in CHW format
         original_image = original_image.permute(1, 2, 0)  # Convert to HWC format
     
     # Normalize image for display
+    original_image = original_image.detach().cpu()
     original_image = original_image - original_image.min()
     original_image = original_image / original_image.max()
-    original_image = original_image.cpu().numpy()
+    original_image = original_image.numpy()
     
-    for j in range(num_features):
-        axes[0, j].imshow(original_image)
-        axes[0, j].axis('off')
-        if j == 0:
-            axes[0, j].set_title('Original Image', fontsize=12)
+    # Plot original image in first column
+    for i in range(num_features):
+        axes[i, 0].imshow(original_image)
+        axes[i, 0].axis('off')
+        if i == 0:
+            axes[i, 0].set_title('Original\nImage', fontsize=14, pad=10)  # Reduced fontsize and padding
     
     # Plot feature maps for each compression ratio
-    for i, feature_map in enumerate(feature_maps, 1):
-        ratio = 1.0 if i == 1 else compression_ratios[i-2]
-        feature_map = feature_map.detach().cpu()
+    for j, feature_map in enumerate(feature_maps, 1):
+        # Get ratio (1.0 for baseline, compression ratio for others)
+        ratio = 1.0 if j == 1 else compression_ratios[min(j-2, len(compression_ratios)-1)]
         
-        for j in range(num_features):
-            # Normalize feature map for visualization
-            fm = feature_map[0, j].numpy()
-            fm = fm - fm.min()
-            fm = fm / (fm.max() + 1e-9)  # Add small epsilon to prevent division by zero
-            
-            axes[i, j].imshow(fm, cmap='viridis')
-            axes[i, j].axis('off')
-            
-            if j == 0:
-                axes[i, j].set_title(f'Ratio: {ratio:.2f}', fontsize=12)
+        # Get feature map data based on type
+        if isinstance(feature_map, torch.Tensor):
+            feature_data = feature_map[0]  # Take first batch
+        else:  # EncodedData
+            # Decompress the feature map
+            feature_data = feature_map.values.view(-1, feature_map.metadata['block_size'], 
+                                                 feature_map.metadata['block_size'])
+            feature_data = feature_data.reshape(1, -1, 
+                                              feature_map.metadata['original_shape'][2],
+                                              feature_map.metadata['original_shape'][3])[0]
+        
+        # Plot each feature channel
+        for i in range(num_features):
+            if i < feature_data.shape[0]:  # Check if channel exists
+                # Normalize feature map for visualization
+                fm = feature_data[i].detach().cpu().numpy()
+                fm = fm - fm.min()
+                fm = fm / (fm.max() + 1e-9)  # Add small epsilon to prevent division by zero
+                
+                axes[i, j].imshow(fm, cmap='viridis')
+                axes[i, j].axis('off')
+                
+                if i == 0:
+                    axes[i, j].set_title(f'r={ratio:.2f}', fontsize=14, pad=10)  # Simplified title, reduced fontsize
+            else:
+                axes[i, j].axis('off')
     
-    plt.tight_layout()
-    plt.savefig(save_path, bbox_inches='tight', dpi=300)
+    # Add channel labels on the left with adjusted position
+    for i in range(num_features):
+        plt.figtext(0.01, 0.8 - i*0.23, f'Ch {i+1}',  # Shortened "Channel" to "Ch"
+                   ha='left', va='center', fontsize=12)  # Reduced fontsize
+    
+    # Save with higher resolution and tight layout
+    plt.savefig(save_path, bbox_inches='tight', dpi=300, pad_inches=0.1)  # Reduced padding
     plt.close()
 
 def evaluate_model(model, test_loader, device, save_feature_maps=False, analyze_compression=False):
@@ -1113,7 +1154,7 @@ def test_workflow():
             baseline_features = baseline_model.get_feature_maps(inputs[0:1])
             all_feature_maps.append(baseline_features)
         
-        baseline_acc, baseline_stats, _ = evaluate_model(
+        baseline_acc, baseline_stats = evaluate_model(
             baseline_model, test_loader, device, analyze_compression=True)
         
         print(f"Baseline Accuracy: {baseline_acc:.2f}%")
@@ -1135,7 +1176,7 @@ def test_workflow():
             })
         
         # Test compression without finetuning
-        ratios = [0.01, 0.05, 0.1, 0.3, 0.5]  # Test with 1% compression
+        ratios = [0.5, 0.3, 0.1, 0.05, 0.01]  # Test with 1% compression
         for ratio in ratios:
             print(f"\nTesting compression (ratio={ratio}) without finetuning...")
             model = ModifiedResNet18(compression_ratio=ratio, method='topk', 
@@ -1146,7 +1187,11 @@ def test_workflow():
                 feature_map = model.get_feature_maps(inputs[0:1], compressed=True)
                 all_feature_maps.append(feature_map)
         
-        accuracy_no_ft, compression_stats, _ = evaluate_model(
+        # Plot feature maps comparison
+        plot_feature_maps_with_ratios(all_feature_maps, original_image, ratios,
+                                    save_path='test_feature_maps_ratio.png')
+        
+        accuracy_no_ft, compression_stats = evaluate_model(
             model, test_loader, device, analyze_compression=True)
         
         print(f"No Finetuning - Accuracy: {accuracy_no_ft:.2f}%, Original BPP: {compression_stats['bpp_original']:.4f}, Compressed BPP: {compression_stats['bpp']:.4f}")
@@ -1173,10 +1218,6 @@ def test_workflow():
         }
         
         results.append(result)
-        
-        # Plot feature maps comparison
-        plot_feature_maps_with_ratios(all_feature_maps, original_image, [ratio],
-                                    save_path='test_feature_maps_ratio.png')
         
         # Test plotting with both baseline and compressed results
         plot_accuracy_vs_compression(results, 'test_accuracy_vs_compression.png')
@@ -1205,7 +1246,7 @@ def main():
     print(f"Using device: {device}")
     
     # Load dataset
-    train_loader, test_loader, num_classes = load_dataset(batch_size=args.batch_size, subset=args.subset)
+    train_loader, test_loader, num_classes = load_dataset(batch_size=args.batch_size)
     
     # Methods and compression ratios to test
     methods = ['topk']

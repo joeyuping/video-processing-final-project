@@ -1,0 +1,111 @@
+{
+    "timestamp": "2025-01-04T23:41:09.264481",
+    "compression_results": [
+        {
+            "ratio": 1.0,
+            "accuracy": 76.36,
+            "bpp": 24.0,
+            "compression_ratio": 1.0
+        },
+        {
+            "ratio": 0.5,
+            "accuracy_no_ft": 73.82,
+            "accuracy_ft": 74.76,
+            "bpp": 443.70880126953125,
+            "compression_ratio": 18.4878667195638,
+            "detailed_stats": {
+                "bpp_original": 24.0,
+                "bpp_compressed": 443.70880126953125,
+                "compression_ratio": 18.4878667195638,
+                "original_bits": 3145728,
+                "compressed_bits": 58157800,
+                "breakdown": {
+                    "values": {
+                        "huffman_bits": 4384573,
+                        "avg_bits": 1.0453636646270752
+                    },
+                    "indices": {
+                        "total_bits": 53773227,
+                        "mode": "channel-wise",
+                        "encoding_scheme": "delta_huffman"
+                    }
+                }
+            }
+        },
+        {
+            "ratio": 0.3,
+            "accuracy_no_ft": 70.59,
+            "accuracy_ft": 74.55,
+            "bpp": 273.43363189697266,
+            "compression_ratio": 11.393067995707193,
+            "detailed_stats": {
+                "bpp_original": 24.0,
+                "bpp_compressed": 273.43363189697266,
+                "compression_ratio": 11.393067995707193,
+                "original_bits": 3145728,
+                "compressed_bits": 35839493,
+                "breakdown": {
+                    "values": {
+                        "huffman_bits": 2704810,
+                        "avg_bits": 1.0754951203684853
+                    },
+                    "indices": {
+                        "total_bits": 33134683,
+                        "mode": "channel-wise",
+                        "encoding_scheme": "delta_huffman"
+                    }
+                }
+            }
+        },
+        {
+            "ratio": 0.1,
+            "accuracy_no_ft": 54.64,
+            "accuracy_ft": 73.13,
+            "bpp": 90.77880859375,
+            "compression_ratio": 3.7824503580729165,
+            "detailed_stats": {
+                "bpp_original": 24.0,
+                "bpp_compressed": 90.77880859375,
+                "compression_ratio": 3.7824503580729165,
+                "original_bits": 3145728,
+                "compressed_bits": 11898560,
+                "breakdown": {
+                    "values": {
+                        "huffman_bits": 1020189,
+                        "avg_bits": 1.2209305108762254
+                    },
+                    "indices": {
+                        "total_bits": 10878371,
+                        "mode": "channel-wise",
+                        "encoding_scheme": "delta_huffman"
+                    }
+                }
+            }
+        },
+        {
+            "ratio": 0.05,
+            "accuracy_no_ft": 35.29,
+            "accuracy_ft": 72.64,
+            "bpp": 45.395301818847656,
+            "compression_ratio": 1.8914709091186523,
+            "detailed_stats": {
+                "bpp_original": 24.0,
+                "bpp_compressed": 45.395301818847656,
+                "compression_ratio": 1.8914709091186523,
+                "original_bits": 3145728,
+                "compressed_bits": 5950053,
+                "breakdown": {
+                    "values": {
+                        "huffman_bits": 565905,
+                        "avg_bits": 1.354513729319853
+                    },
+                    "indices": {
+                        "total_bits": 5384148,
+                        "mode": "channel-wise",
+                        "encoding_scheme": "delta_huffman"
+                    }
+                }
+            }
+        }
+    ]
+}
